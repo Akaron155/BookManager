@@ -1,0 +1,374 @@
+数据库实验要求：
+
+1. 完成一个基本的图书管理系统，具有普通用户和管理员两种角色，其中普通用户可以通过注册加入到系统中，但是用户名和手机号必须是唯一的，普通用户登录后可以查看和修改个人信息、查看书籍列表、对书籍进行借阅和归还操作、查看借阅记录；管理员可以管理普通用户、管理书籍信息、查看每个用户的借阅记录。
+2. 普通用户和管理员的登录密码必须要加密后存储到数据库中，并且普通用户和管理员必须采用不同的密钥，但是加密算法可以是同一个，可使用任意加密算法。
+3. 每个书籍有对应的分类，如“小说”、“散文”等，管理员可以操作这些分类信息，并且为书籍设置分类信息；每本书籍需要有库存，当库存不足时用户无法借阅。
+4. 每个用户的密钥可以不一样，在用户注册的时候随机自动生成，用户可以自行选择加密算法（包括对称密码算法、公钥密码算法和散列函数等）。数据库中需要专门一张表存储用户所选择的密钥和加密算法的信息，若用户选择公钥密码算法，则要专门另建表存储私钥。管理员必须使用公钥密码算法进行加解密操作。
+5. 当用户借书发生逾期时，禁止用户的借书功能，直到归还为止。
+6. 增加数据库的访问控制，即不能用超级用户（如MySQL的root）直接通过JDBC（或其它驱动）连接数据库，应当创建一个专门的数据库用户，使之只能访问本图书管理系统所用的数据库中的表，并且对这些表只有基本的查插删改操作，禁止创建表和删除表。
+四人
+7. 增加专门的安全管理员，可以实现多级密钥管理功能，即选择加密算法和密钥（称为一级密钥）对用户密钥（称为二级密钥）进行加密。安全管理员可生成一级密钥，并查看被加密的二级密钥以及所使用的加密算法。一级密钥在没有用于任何加密时可删除，当加密了二级密钥后不能被删除。
+8. 原来的管理员定义为系统管理员。
+五人
+9. 安全管理员增加审计功能，能够查看日志。管理员和普通用户的各种行为都会产生日志，比如注册、登录、修改密码、借书、还书、生成密钥、执行加密操作等，日志中还要记录行为的结果（成功与失败）以及操作人员的IP地址，对于注册操作，可在用户表中安排一条“临时用户”记录。安全管理员可以根据用户名、行为结果和日期范围对日志进行筛选。
+10. 若某个用户在短时间内多次登录失败，则限定其在一定时间内禁止登录。
+11. 若某个IP在短时间内多次注册，则限定其在一定时间内禁止注册（可选）。
+
+
+
+每个书籍有对应的分类，如“小说”、“散文”等，
+管理员可以操作这些分类信息，并且为书籍设置分类信息
+每本书籍需要有库存，当库存不足时用户无法借阅。
+
+
+
+操作系统实验要求：
+
+1. 捕获键盘输入，并通过一定的方式（在屏幕的某个位置、保存文件）记录结果；将结果发送到指定邮箱（可选）。
+2. 需要把键盘的输入记录成脚本，保存成文件，也可以通过打开（或运行）该文件执行脚本。
+3. 可以自定义脚本的运行时间，即指定某个脚本运行的日期和时分秒。
+4. 脚本中可定义重复连续某个键，例如在短时间连续按A键100次（可选）。
+5. 捕获鼠标输入，包括指针位置、点击情况（左键单击和双击、右键单击），并通过一定的方式（在屏幕的某个位置、保存文件）记录结果。
+6. 需要把鼠标的输入记录成脚本，保存成文件，也可以通过打开（或运行）该文件执行脚本。
+7. 可以定义鼠标连点效果（可选）。
+8. 可以自定义脚本的运行时间（可选）。
+
+
+
+数据库结构部分：
+
+CREATE table if not exists `admin`
+(
+	id		  int unsigned auto_increment comment 'ID'
+		primary key,
+	username	varchar(20)          not null comment '用户名',
+	password	varchar(32)          null comment '密码',
+	email       varchar(128) default '' null comment '邮箱',
+	user_pic    varchar(128) default '' null comment '头像',
+	phone       varchar(11)          not null comment '手机号',
+	books       varchar(10)  default '' null comment '借阅的书籍',
+	usertype    varchar(2)           not null comment '用户类型',
+	constraint username unique (username),
+	constraint phone unique (phone)
+)
+	comment '管理员表';
+
+INSERT INTO `admin` (`id`, `username`, `password`, `email`, `user_pic`, `phone`, `books`, `usertype`) VALUES
+(1, 'admin', 'e10adc3949ba59abbe56e057f20f883e', 'm13123856573@163.com', 'admin.png', '13123831275', NULL, '0');
+
+
+create table if not exists `user`
+(
+	id		  int unsigned auto_increment comment 'ID'
+		primary key,
+	username    varchar(20)          not null comment '用户名',
+	password    varchar(32)          null comment '密码',
+	nickname    varchar(10)  default '' null comment '昵称',
+	email       varchar(128) default '' null comment '邮箱',
+	user_pic	varchar(128) default '' null comment '头像',
+	phone       varchar(11)          not null comment '手机号',
+	usertype    varchar(2)           not null comment '用户类型',
+	books       varchar(10)  default '' null comment '借阅的书籍',
+	create_time datetime                not null comment '创建时间',
+	update_time datetime                not null comment '修改时间',
+	constraint username
+		unique (username)
+)
+	comment '用户表';
+
+INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `email`, `user_pic`, `create_time`, `update_time`, `books`) VALUES
+(1, 'admin', 'e10adc3949ba59abbe56e057f20f883e', '管理员', 'admin@example.com', 'user_pic.jpg', '2024-06-25 15:15:34', '2024-06-25 15:15:34', ',4,3'),
+(2, 'testuser', 'e10adc3949ba59abbe56e057f20f883e', '', '', '', '2024-06-25 15:24:26', '2024-06-25 15:24:26', NULL),
+(3, 'testuser1', 'e10adc3949ba59abbe56e057f20f883e', '', '', '', '2024-06-25 15:27:21', '2024-06-25 15:27:21', NULL);
+
+
+INSERT INTO `user` (`id`, `username`, `password`, `nickname`, `email`, `user_pic`, `create_time`, `update_time`, `books`, `phone`, `usertype`) VALUES
+(1, 'admin', 'e10adc3949ba59abbe56e057f20f883e', '管理员', 'admin@example.com', 'user_pic.jpg', '2024-06-25 15:15:34', '2024-06-25 15:15:34', ',4,3', '13123831275', '1'),
+(2, 'testuser', 'e10adc3949ba59abbe56e057f20f883e', '', '', '', '2024-06-25 15:24:26', '2024-06-25 15:24:26', NULL, '13123831276', '1'),
+(3, 'testuser1', 'e10adc3949ba59abbe56e057f20f883e', '', '', '', '2024-06-25 15:27:21', '2024-06-25 15:27:21', NULL, '13123831277', '1');
+
+
+
+
+CREATE TABLE `students` (
+							`id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+							`stu_number` varchar(15) COLLATE utf8_unicode_ci NOT NULL COMMENT '学号',
+							`stu_name` varchar(20) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '姓名',
+							`stu_gender` varchar(2) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '性别',
+							`stu_password` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '密码',
+							`stu_institute` varchar(30) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '学院',
+							`stu_enrollment_date` date DEFAULT NULL COMMENT '入学日期',
+							`email` varchar(128) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '邮箱',
+							`user_pic` varchar(128) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '头像',
+							`create_time` datetime NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '创建时间',
+							`update_time` datetime NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+							`status` tinyint(1) unsigned zerofill NOT NULL DEFAULT '0',
+							`books` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '借阅的书籍',
+							PRIMARY KEY (`id`,`stu_number`) USING BTREE
+) ENGINE=MyISAM AUTO_INCREMENT=48 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+
+INSERT INTO `students` (`id`, `stu_number`, `stu_name`, `stu_gender`, `stu_password`, `stu_institute`, `stu_enrollment_date`, `email`, `user_pic`, `create_time`, `update_time`, `status`, `books`) VALUES
+(1, '22415010101', '阙安旗', '女', 'e10adc3949ba59abbe56e057f20f883e', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-12-23 14:27:57', '2024-12-23 14:27:57', 0, NULL),
+(2, '22415010102', '黄祺垒', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(3, '22415010103', '叶勇波', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(4, '22415010104', '李晨堃', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-25 15:15:34', '2024-06-28 11:09:54', 0, ''),
+(5, '22415010105', '叶佳雨', '女', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(6, '22415010106', '张阳辉', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(7, '22415010107', '莫觉', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(8, '22415010108', '林周成', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(9, '22415010109', '鲍卓洋', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(10, '22415010110', '邹建磊', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(11, '22415010111', '包奕阳', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(12, '22415010112', '叶子煜', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(13, '22415010113', '唐文轩', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(14, '22415010114', '周叶绍', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(15, '22415010115', '胡宝之', '女', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(16, '22415010116', '赵子圣', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(17, '22415010117', '王安童', '女', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(18, '22415010118', '徐国伟', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(19, '22415010119', '邱一凡', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(20, '22415010120', '赵依俊', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(21, '22415010121', '杨安妮', '女', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(22, '22415010122', '闵瑜杰', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(23, '22415010123', '周迎川', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(24, '22415010124', '何奕林', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(25, '22415010125', '刘嘉程', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(26, '22415010126', '杨丁宇', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(27, '22415010127', '赵志春', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(28, '22415010128', '何玉岑', '女', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(29, '22415010129', '赵庭川', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(30, '22415010130', '曹阳', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(31, '22415010131', '王文卓', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(32, '22415010132', '黄国靖', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(33, '22415010133', '程远康', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(34, '22415010134', '谢天成', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(35, '22415010135', '罗镇现', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(36, '22415010136', '杨一诺', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(37, '22415010137', '王政', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(38, '22415010138', '蒋民宇', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(39, '22415010139', '徐承园', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL),
+(40, '22415010140', '刘明皓', '男', '9da603136c4f3932e1ef09136ed45f7f', '网络空间安全学院', '2022-09-15', 'student@nbut.edu.cn', 'student_icon', '2024-06-26 01:34:38', '2024-06-26 01:34:38', 0, NULL);
+
+
+
+create table if not exists `article`
+(
+    id          int unsigned auto_increment comment 'ID'
+        primary key,
+    isbn        varchar(30)                 not null comment '索书号',
+    title       varchar(30)                 not null comment '图书标题',
+    content     varchar(10000)              not null comment '图书简介',
+    cover_img   varchar(128)                not null comment '图书封面',
+    state       varchar(3) default '未借阅' null comment '图书状态: 只能是[未借阅] 或者 [已借阅]',
+    category_id int unsigned                null comment '图书分类ID',
+    create_user int unsigned                not null comment '创建人ID',
+    create_time datetime                    not null comment '创建时间',
+    update_time datetime                    not null comment '修改时间',
+    number      varchar(255) default '0/0'  not null comment '图书数量',
+    borrowed_by varchar(10000)              default null comment '被借阅信息'
+)
+    comment '图书信息表';
+
+
+INSERT INTO `article` (`id`, `isbn`, `title`, `content`, `cover_img`, `state`, `category_id`, `create_user`, `create_time`, `update_time`, `number`) VALUES
+(1, '1', '三体', '刘慈欣著作的科幻小说', '', '已借阅', 1, 1, '2024-06-27 22:36:27', '2024-06-28 12:37:32', '10/10'),
+(2, '2', '基地', '阿西莫夫的科幻系列', '', '已借阅', 1, 1, '2024-06-25 15:15:34', '2024-06-28 15:17:29', '10/10'),
+(3, '3', '沙丘', '弗兰克·赫伯特的科幻小说', '', '未借阅', 1, 1, '2024-06-25 15:15:34', '2024-06-28 15:17:29', '9/10'),
+(4, '4', '魔戒', '托尔金的奇幻小说', '', '未借阅', 2, 1, '2024-06-25 15:15:34', '2024-06-28 15:15:33', '9/10'),
+(5, '5', '纳尼亚传奇', 'C.S.刘易斯的奇幻小说', 'na_ni_ya.jpg', '未借阅', 2, 1, '2024-06-25 15:15:34', '2024-06-25 15:15:34', '10/10'),
+(6, '6', '哈利·波特', 'J.K.罗琳的奇幻小说', 'ha_li_bo_te.jpg', '未借阅', 2, 1, '2024-06-25 15:15:34', '2024-06-25 15:15:34', '10/10'),
+(7, '7', '人类简史', '尤瓦尔·赫拉利的非虚构著作', 'ren_lei_jian_shi.jpg', '未借阅', 3, 1, '2024-06-25 15:15:34', '2024-06-25 15:15:34', '10/10'),
+(8, '8', '枪炮、病菌与钢铁', '贾雷德·戴蒙德的非虚构著作', 'qiang_pao_bing_jun_yu_gang_tie.jpg', '未借阅', 3, 1, '2024-06-25 15:15:34', '2024-06-25 15:15:34', '10/10'),
+(9, '9', '自私的基因', '理查德·道金斯的非虚构著作', 'zi_si_de_ji_yin.jpg', '未借阅', 3, 1, '2024-06-25 15:15:34', '2024-06-25 15:15:34', '10/10');
+
+
+### 接口测试部分：
+#### 管理员
+/admin/login -- POST
+```
+POST /admin/login HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 30
+
+username=admin&password=123456
+```
+/admin/adminInfo -- GET -- 返回用户的密码这个隐私数据
+```
+GET /admin/adminInfo HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+
+```
+
+/admin/updateAvatar -- PATCH
+```
+PATCH /admin/updateAvatar?avatarUrl=admin1.png HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJUeXBlIjoiMCIsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM1MDA5Mjg2fQ.0zWKvts3TujcqGyp3SUbY8aHdwaCRR7KEyGqHQ5DywM
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Length: 0
+
+
+```
+
+#### 普通用户
+/user/login -- POST
+```
+POST /user/login HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 30
+
+username=admin&password=123456
+```
+
+/user/register -- POST
+```
+POST /user/register HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 83
+
+username=admin1&password=12345&nickname=Aaron&email=123@gmail.com&phone=13123831276
+```
+
+/user/userInfo -- GET -- 返回用户的密码这个隐私数据
+```
+GET /user/userInfo HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+
+```
+
+
+#### 图书借阅部分
+/article/list -- GET -- 查询书籍信息功能
+```
+GET /article?pageNum=1&pageSize=9 HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+
+```
+
+/article/add -- POST/json -- 添加书籍功能
+```
+POST /article HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Type: application/json
+Content-Length: 112
+
+{"isbn":"9","title":"test","content":"123","coverImg":"test.png","state":"草稿","categoryId":3,"createUser":1,"number":"10/10"}
+```
+
+/article/delete -- DELETE -- 删除图书
+```
+
+```
+
+/article/detail -- GET -- 获取书籍详细信息
+```
+GET /article/detail?id=1 HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifSwiZXhwIjoxNzM0OTYyNTc1fQ.O3L6YmQaQkO6uog3wKswS5IBklXld9n7xxv_Yo_taao
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+
+```
+
+/article/update -- PUT -- 更新图书信息
+```
+PUT /article/update HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjYsInVzZXJUeXBlIjoiMSIsInVzZXJuYW1lIjoiYWRtaW4xIn0sImV4cCI6MTczNDk4NDYwOX0.KeE1ugD_-afh0P2orywkzaCG01LeFW3M4LHBXtUH-ic
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Content-Type: application/json
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Length: 142
+
+{"id":"22","isbn":"9","title":"test","content":"123","coverImg":"test.png","state":"未借阅","categoryId":3,"createUser":1,"number":"10/10"}
+```
+
+/article/borrow -- GET --
+```
+GET /article/borrow?id=1 HTTP/1.1
+Host: 192.168.64.1:18001
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJjbGFpbXMiOnsiaWQiOjYsInVzZXJUeXBlIjoiMSIsInVzZXJuYW1lIjoiYWRtaW4xIn0sImV4cCI6MTczNDk4NDYwOX0.KeE1ugD_-afh0P2orywkzaCG01LeFW3M4LHBXtUH-ic
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+Content-Length: 0
+
+
+```
+
+/article/return -- GET --
+```
+
+```
