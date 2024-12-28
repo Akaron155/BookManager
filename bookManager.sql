@@ -51,15 +51,17 @@ create table if not exists operate_log
 )
     comment '操作日志表';
 
-create table if not exists user
+create table if not exists `user`
 (
-    id          int unsigned auto_increment comment 'ID'
-        primary key,
-    username    varchar(20)             not null comment '用户名',
-    password    varchar(32)             null comment '密码',
+    id        int unsigned auto_increment comment 'ID' primary key,
+    username    varchar(20)          not null comment '用户名',
+    password    varchar(32)          null comment '密码',
     nickname    varchar(10)  default '' null comment '昵称',
     email       varchar(128) default '' null comment '邮箱',
     user_pic    varchar(128) default '' null comment '头像',
+    phone       varchar(11)          not null comment '手机号',
+    usertype    varchar(2)           not null comment '用户类型',
+    books       varchar(10000)  default '' null comment '借阅的书籍',
     create_time datetime                not null comment '创建时间',
     update_time datetime                not null comment '修改时间',
     constraint username
@@ -67,21 +69,55 @@ create table if not exists user
 )
     comment '用户表';
 
-CREATE table if not exists admin
+CREATE table if not exists `admin`
 (
-    id          int unsigned auto_increment comment 'ID'
+    id        int unsigned auto_increment comment 'ID'
         primary key,
-    username    varchar(20)             not null comment '用户名',
-    password    varchar(32)             null comment '密码',
+    username    varchar(20)          not null comment '用户名',
+    password    varchar(32)          null comment '密码',
     email       varchar(128) default '' null comment '邮箱',
     user_pic    varchar(128) default '' null comment '头像',
-    phone       varchar(11)             not null comment '手机号',
-    usertype    varchar(2)              not null comment '用户类型',
+    phone       varchar(11)          not null comment '手机号',
+    books       varchar(10000)  default '' null comment '借阅的书籍',
+    usertype    varchar(2)           not null comment '用户类型',
     constraint username unique (username),
     constraint phone unique (phone)
 )
     comment '管理员表';
-    
+
+CREATE table if not exists `system_admin`
+(
+    id        int unsigned auto_increment comment 'ID'
+        primary key,
+    username    varchar(20)          not null comment '用户名',
+    password    varchar(345)          null comment '密码',
+    email       varchar(128) default '' null comment '邮箱',
+    user_pic    varchar(128) default '' null comment '头像',
+    phone       varchar(11)          not null comment '手机号',
+    secret_key  varchar(1625)        default null comment '密钥',
+    public_key  varchar(1625)        default null comment '公钥',
+    usertype    varchar(2)           not null comment '用户类型',
+    crypt_type  varchar(2)           default null comment '加密类型',
+    constraint username unique (username),
+    constraint phone unique (phone)
+)
+    comment '系统管理员表';
+
+
+INSERT INTO `system_admin` (`id`, `username`, `password`, `email`, `user_pic`, `phone`, `secret_key`, `public_key`, `usertype`, `crypt_type`) VALUES
+(1, 'sysadmin', 'trpnO2fbGiVLF4QPQ8YoeZ2ZsuJUwX8/ja9Rwr2oLhn8R8RyiVZPOjUEb0O6gH4oUhbQLPYPHV0YFLP3IpFHa6Uibws8/Y+R04jCpvVlqI6C+GoRt1v6dGUvkMC2UM42cep3QDE+PS113JPGSeencKwV89UhG+ohgQqUg5Lnm0cyaR+qcKEUlbAXUz+7vT8TxkHIol+LS6xYr3E0VB6/Fh0VSZ0WwrK8MN0c6ht2bLwXYgTJkGk1qeMsPWj6xnMkwYl2Y36KdKT2eETsZJU6KlyWueCsnnDR1PaeJiOm9rX44lZVk0sHrF4byECJXZAwxDunZaxUbdvGXi13klKlpQ==', 'Aaron@gmail.com', 'sysadmin.png', '13123831279', NULL, NULL, '2', NULL);
+
+
+CREATE TABLE IF NOT EXISTS `key_table`
+(
+    id           int unsigned auto_increment comment 'ID' primary key,
+    usertype     varchar(2)           not null comment '用户类型',
+    username     varchar(20)          not null comment '用户名',
+    encrypto_key varchar(1625)        not null comment '加密的二级密钥',
+    crypto_type  varchar(2)          default null comment '加密类型（0）哈希，（1）对称'
+)
+    comment '二级密钥表';
+
 -- 测试数据
 INSERT INTO user (username, password, nickname, email, user_pic, create_time, update_time)
 VALUES ('admin', 'e10adc3949ba59abbe56e057f20f883e', '管理员', 'admin@example.com', 'user_pic.jpg', NOW(), NOW());
